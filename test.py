@@ -204,17 +204,19 @@ def get_verification_status(prediction_result, train_names, unverified_names):
         list
             List containing all verification status from prediction results
     '''
-    verification_status_list = np.empty((len(prediction_result), 2), dtype=object)
+    verification_status_list = np.empty(len(prediction_result)*2, dtype=object)
+    test_length = len(prediction_result)
 
     for index, prediction_result in enumerate(prediction_result):
         for i in range(0, len(unverified_names)):
             
             if(train_names[prediction_result] == unverified_names[i]):
-                verification_status_list[index] = ["Unverified", prediction_result]
+                verification_status_list[index] = "Unverified"
+                verification_status_list[index+test_length] = prediction_result
                 break
             else:
-                verification_status_list[index] = ["Verified", prediction_result]
-        print(verification_status_list[index])
+                verification_status_list[index] = "Verified"
+                verification_status_list[index+test_length] = prediction_result
     return verification_status_list
 
 
@@ -240,30 +242,29 @@ def draw_prediction_results(verification_statuses, test_image_list, test_faces_r
     '''
 
     drawn_image_list = []
+    test_length = len(test_image_list)
 
-    for index, verification_statuses in enumerate(verification_statuses):
+    for index, test_image_list in enumerate(test_image_list):
         x,y,w,h = test_faces_rects[index]
-        ab = verification_statuses
-        a,b = zip(*ab)
-        print(a)
-        print(b)
-        if(verification_statuses.any() == "Unverified"):
-            cv2.putText(test_image_list[index], train_names[index], (x, y), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 1)
 
-            cv2.rectangle(test_image_list[index], (x,y), (x+w, y+h), (0, 0, 255), 1)
+        if(verification_statuses[index] == "Unverified"):
+            cv2.putText(test_image_list, train_names[verification_statuses[index+test_length]], (x, y), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 1)
 
-            cv2.putText(test_image_list[index], verification_statuses[index], (x, y+h+40), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 2)            
+            cv2.rectangle(test_image_list, (x,y), (x+w, y+h), (0, 0, 255), 1)
+
+            cv2.putText(test_image_list, verification_statuses[index], (x, y+h+40), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 2)            
         else:
-            cv2.putText(test_image_list[index], train_names[index], (x, y), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 1)
+            cv2.putText(test_image_list, train_names[verification_statuses[index+test_length]], (x, y), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 1)
 
-            cv2.rectangle(test_image_list[index], (x,y), (x+w, y+h), (0, 255, 0), 1)
+            cv2.rectangle(test_image_list, (x,y), (x+w, y+h), (0, 255, 0), 1)
 
-            cv2.putText(test_image_list[index], verification_statuses[index], (x, y+h+40), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 2)
+            cv2.putText(test_image_list, verification_statuses[index], (x, y+h+40), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 2)
 
-        cv2.imshow('Results', test_image_list[index])
+        cv2.imshow('Results', test_image_list)
         cv2.waitKey(0)
 
-        drawn_image_list.append(test_image_list[index])
+        drawn_image_list.append(test_image_list)
+    return drawn_image_list
     
     
 def combine_and_show_result(image_list):
@@ -296,4 +297,4 @@ prediction_result = predict(recognizer, test_faces_gray)
 verification_statuses = get_verification_status(prediction_result, train_names, unverified_names)
 predicted_test_image_list = draw_prediction_results(verification_statuses, test_image_list, test_faces_rects, train_names)
 
-# combine_and_show_result(predicted_test_image_list) 
+combine_and_show_result(predicted_test_image_list) 
