@@ -260,8 +260,8 @@ def draw_prediction_results(verification_statuses, test_image_list, test_faces_r
 
             cv2.putText(test_image_list, verification_statuses[index], (x, y+h+40), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 2)
 
-        cv2.imshow('Results', test_image_list)
-        cv2.waitKey(0)
+        # cv2.imshow('Results', test_image_list)
+        # cv2.waitKey(0)
 
         drawn_image_list.append(test_image_list)
     return drawn_image_list
@@ -278,7 +278,10 @@ def combine_and_show_result(image_list):
     '''
     for index, image_list in enumerate(image_list):
         
-        print()
+        image_list = cv2.resize(image_list, (250,250))
+        
+        cv2.imshow('Results', image_list)
+        cv2.waitKey(0)
 
 train_root_path = "dataset/Train"
 train_names = get_path_list(train_root_path)
