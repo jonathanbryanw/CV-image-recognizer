@@ -4,7 +4,6 @@
 import os
 import cv2
 import numpy as np
-import math
 
 def get_path_list(root_path):
     '''
@@ -83,6 +82,7 @@ def detect_faces_and_filter(image_list, image_classes_list=None):
 
     train_face_list = []
     train_class_list = []
+    face_rect_list = []
 
     for index, image_list in enumerate(image_list):
         
@@ -90,22 +90,24 @@ def detect_faces_and_filter(image_list, image_classes_list=None):
 
         detected_faces = face_cascade.detectMultiScale(image_list, scaleFactor = 1.2, minNeighbors = 5)
 
-        if(len(detected_faces) < 1):
+        if len(detected_faces) < 1:
             continue
-        if(len(detected_faces) > 1):
+        if len(detected_faces) > 1:
             continue
         for face_rect in detected_faces:
             x,y,w,h = face_rect
-
+            face_rects = x,y,w,h
+            face_rect_list.append(face_rects)
             face_img = image_list[y:y+w, x:x+h]
 
             train_face_list.append(face_img)
-            if(image_classes_list == None):
-                continue            
-            train_class_list.append(image_classes_list[index])
             
+            if(image_classes_list == None):
+                continue
+            train_class_list.append(image_classes_list[index])     
 
-    return train_face_list, face_rect, train_class_list
+    return train_face_list, face_rect_list, train_class_list
+
 
 def train(train_face_grays, image_classes_list):
     '''
@@ -146,10 +148,9 @@ def get_test_images_data(test_root_path):
     for image_path in os.listdir(test_root_path):
         full_image_path = test_root_path + '/' + image_path
         img_bgr = cv2.imread(full_image_path)
-        img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
 
-        test_image_list.append(img_gray)
-    return test_image_list    
+        test_image_list.append(img_bgr)
+    return test_image_list
     
 def predict(recognizer, test_faces_gray):
     '''
@@ -167,11 +168,13 @@ def predict(recognizer, test_faces_gray):
         list
             List containing all prediction results from given test faces
     '''
+    result_list = []
+
     for index, test_faces_gray in enumerate(test_faces_gray):
         result,_ = recognizer.predict(test_faces_gray)
-        print(result)
+        result_list.append(result)
 
-    return result      
+    return result_list    
 
 def get_verification_status(prediction_result, train_names, unverified_names):
     '''
@@ -191,6 +194,20 @@ def get_verification_status(prediction_result, train_names, unverified_names):
         list
             List containing all verification status from prediction results
     '''
+    verification_status_list = np.empty(len(prediction_result)*2, dtype=object)
+    test_length = len(prediction_result)
+
+    for index, prediction_result in enumerate(prediction_result):
+        for i in range(0, len(unverified_names)):
+            
+            if train_names[prediction_result] == unverified_names[i]:
+                verification_status_list[index] = "Unverified"
+                verification_status_list[index+test_length] = prediction_result
+                break
+            else:
+                verification_status_list[index] = "Verified"
+                verification_status_list[index+test_length] = prediction_result
+    return verification_status_list
 
 def draw_prediction_results(verification_statuses, test_image_list, test_faces_rects, train_names):
     '''
@@ -212,6 +229,33 @@ def draw_prediction_results(verification_statuses, test_image_list, test_faces_r
         list
             List containing all test images after being drawn
     '''
+    test_length = len(test_image_list)
+    drawn_image_list = np.empty(len(test_image_list)*2, dtype=object)
+    vcount = 1
+    uvcount = 0
+
+    for index, test_image_list in enumerate(test_image_list):
+        x,y,w,h = test_faces_rects[index]
+
+        if verification_statuses[index] == "Unverified":
+            cv2.putText(test_image_list, train_names[verification_statuses[index+test_length]], (x, y), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 1)
+
+            cv2.rectangle(test_image_list, (x,y), (x+w, y+h), (0, 0, 255), 1)
+
+            cv2.putText(test_image_list, verification_statuses[index], (x, y+h+40), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 2)  
+
+            drawn_image_list[uvcount] = test_image_list
+            uvcount+=2
+        else:
+            cv2.putText(test_image_list, train_names[verification_statuses[index+test_length]], (x, y), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 1)
+
+            cv2.rectangle(test_image_list, (x,y), (x+w, y+h), (0, 255, 0), 1)
+
+            cv2.putText(test_image_list, verification_statuses[index], (x, y+h+40), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 2)
+            drawn_image_list[vcount] = test_image_list
+            vcount+=2
+
+    return drawn_image_list
     
 def combine_and_show_result(image_list):
     '''
@@ -222,6 +266,28 @@ def combine_and_show_result(image_list):
         image_list : nparray
             Array containing image data
     '''
+    length = len(image_list)*2
+
+    for i in range(0, length):
+        if i == 0:
+            image_list[i] = cv2.resize(image_list[i], (250,250))
+            uv_images = image_list[i]
+        elif i == 1:
+            image_list[i] = cv2.resize(image_list[i], (250,250))
+            v_images = image_list[i]
+        elif image_list[i] is not None :
+            image_list[i] = cv2.resize(image_list[i], (250,250))
+            if i%2==0:
+                uv_images = cv2.hconcat([uv_images, image_list[i]]) 
+            else:
+                v_images = cv2.hconcat([v_images, image_list[i]])
+        elif image_list[i+1] is None:
+            break
+        else:
+            continue
+    combined_image = cv2.vconcat([uv_images,v_images])
+    cv2.imshow("Results", combined_image)
+    cv2.waitKey(0)
 
 '''
 You may modify the code below if it's marked between
